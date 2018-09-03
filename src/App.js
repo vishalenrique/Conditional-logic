@@ -17,128 +17,44 @@ const isFunction = input => typeof input === "function";
 const renderIf = predicate => elemOrThunk =>
   predicate ? (isFunction(elemOrThunk) ? elemOrThunk() : elemOrThunk) : null;
 
-const mapObject = (obj, callback) => {
-  const keys = Object.keys(obj);
-  const newObj = {};
+function evaluateChangeEffects(fieldState,fieldChangeEffects,objectWithNewValue){
+  
+  let newFieldState = {...fieldState};
+  let changedObjectKey = Object.keys(objectWithNewValue)[0];//readyForPickUp
+  let changedValue = objectWithNewValue[changedObjectKey];//""
 
-  for (const key of keys) {
-    // eslint-disable-line no-restricted-syntax
-    newObj[key] = callback(obj[key], key);
-  }
+  let effectedObjects = fieldChangeEffects[changedObjectKey];//pickUpOn{}
 
-  return newObj;
-};
-//getProcessedFields x
-//object assign x.fields to state
-//change field cf{name: value}
-//check if cf.name exists in x.fieldChangeEffects if(x.fieldChangeEffects[cf.name])
-//if not quit
-//if yes
-//convert x.fieldChangeEffects to array of type FieldChangeEffectRuleType
-//loop through FieldChangeEffectRuleTypeArray
-//write a function to calculate
+  if(effectedObjects){
+          Object.keys(effectedObjects).forEach((effectedKey)=>{
 
-let fieldChangeEffectsObject = {};
-Object.keys(fieldChangeEffects).forEach(i => {
-  Object.keys(fieldChangeEffects[i]).forEach(j => {
-    if (!fieldChangeEffectsObject[i]) {
-      fieldChangeEffectsObject[i] = [];
-    }
-    fieldChangeEffectsObject[i].push({ [j]: fieldChangeEffects[i][j] });
-  });
-});
+            let effectedCurrentObject = effectedObjects[effectedKey];//{readable:{},editable:{},required:{}}
+          
+            let readable = "readable"
+          
+            let booleanResult = evaluateCondition(effectedCurrentObject[readable],fieldState,lotDetailsMapper);
 
-/*console.log(
-  calculateFieldChanges(fieldChangeEffectsObject)(FIELDS1.data)(
-    "readyForPickup",
-    ["ready_for_pickup"],
-    "pick_up_on"
-  )
-);*/
-function fieldChangeEffectsCalculator(state, fieldChangeEffects, changedField) {
-  let newState = { ...state };
-  let changedKey = Object.keys(changedField)[0];
-  let changedValue = changedField[changedKey];
+            newFieldState = {...newFieldState,
+              ...{[effectedKey]:{...newFieldState[effectedKey],...{readable:booleanResult},...{value:null}}}}
 
-  if (!fieldChangeEffects[changedKey]) {
-    return newState;
-  }
+          });
+        }
 
-  let fieldChangeEffectsObject = {};
-  Object.keys(fieldChangeEffects).forEach(i => {
-    Object.keys(fieldChangeEffects[i]).forEach(j => {
-      if (!fieldChangeEffectsObject[i]) {
-        fieldChangeEffectsObject[i] = [];
-      }
-      fieldChangeEffectsObject[i].push({ [j]: fieldChangeEffects[i][j] });
-    });
-  });
-  //console.log(fieldChangeEffectsObject);
-  return singleFieldChangeEffectsCalculator(
-    state,
-    fieldChangeEffectsObject,
-    changedKey
-  );
+  return newFieldState;
+
+  // let effectedKey = Object.keys(effectedObjects)[0];//pickUpOn
+  // let effectedCurrentObject = effectedObjects[effectedKey];//{readable:{},editable:{},required:{}}
+
+  // let readable = "readable"
+
+  // let booleanResult = evaluateCondition(effectedCurrentObject[readable],fieldState,lotDetailsMapper);
+
+  //   newFieldState = {...newFieldState,
+  //  ...{[effectedKey]:{...newFieldState[effectedKey],...{readable:booleanResult}}}}
+  //  return newFieldState;
+
 }
-
-function singleFieldChangeEffectsCalculator(
-  state,
-  fieldChangeEffectsObject,
-  changedKey
-) {
-  let newState = { ...state };
-  //console.log("Begin>>>", newState, changedKey);
-  fieldChangeEffectsObject[changedKey].forEach(i => {
-    let key = Object.keys(i)[0];
-    // console.log(i, key);
-
-    newState = {
-      ...newState,
-      [key]: {
-        ...newState[key],
-        ...mapObject(i[key], (condition, l) => {
-          if (key === "pickUpOn") {
-            // console.log(condition, l, newState);
-          }
-          return evaluateCondition(condition, newState, lotDetailsMapper);
-        })
-      }
-    };
-    //console.log(newState[key], key);
-    if (!newState[key].readable) {
-      newState[key].value = null;
-    }
-    //console.log("End>>>", newState);
-
-    if (fieldChangeEffectsObject[key]) {
-      newState = singleFieldChangeEffectsCalculator(
-        newState,
-        fieldChangeEffectsObject,
-        key
-      );
-    }
-  });
-  return newState;
-}
-
 class App extends Component {
-  handleFieldChange = (event, i) => {
-    const fieldsState = {
-      ...this.state.fields,
-      ...{ [i]: { ...this.state.fields[i], ...{ value: event.target.value } } }
-    };
-    //console.log("test1");
-    let newState = fieldChangeEffectsCalculator(
-      fieldsState,
-      this.state.fieldChangeEffects,
-      { [i]: event.target.value }
-    );
-    //console.log("test2");
-    console.log(fieldsState);
-    console.log(newState);
-    this.setState({ fields: newState });
-  };
-
   state = {
     fields: processFields(FIELDS1.data, lotDetailsMapper).fields,
     fieldChangeEffects: processFields(FIELDS1.data, lotDetailsMapper)
@@ -152,6 +68,20 @@ class App extends Component {
     ]
   };
 
+  handleFieldChange = (event, i) => {
+    const fieldState = {
+      ...this.state.fields,
+      ...{[i]:{...this.state.fields[i],...{value:event.target.value}}}};
+
+    console.log("handleChange", fieldState);
+   const newState = evaluateChangeEffects(fieldState,
+    this.state.fieldChangeEffects,
+    {[i]:event.target.value});
+
+    this.setState({fields:newState});
+  };
+
+
   render() {
     return (
       <div className="App">
@@ -161,8 +91,10 @@ class App extends Component {
         </header>
         <p className="App-intro">
           {this.state.displayFields.map(i => {
-            console.log(i, "FIELD -> ", this.state.fields[i]);
-            console.log(i,"FIELD_EFFECT -> ",this.state.fieldChangeEffects[i]);
+            {
+               console.log(i, "FIELD -> ", this.state.fields[i]);
+            console.log(i,"FIELD_EFFECT -> ",this.state.fieldChangeEffects[i]); 
+            }
             return renderIf(this.state.fields[i].readable)(
               <div>
                 {i}
