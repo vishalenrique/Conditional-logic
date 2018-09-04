@@ -20,13 +20,14 @@ const renderIf = predicate => elemOrThunk =>
 function evaluateChangeEffects(fieldState,fieldChangeEffects,objectWithNewValue){
   
   let newFieldState = {...fieldState};
-  let changedObjectKey = Object.keys(objectWithNewValue)[0];//readyForPickUp
-  let changedValue = objectWithNewValue[changedObjectKey];//""
+  let changedObjectKey = Object.keys(objectWithNewValue)[0];//readyForPickUp//pickUpOn
+  let changedValue = objectWithNewValue[changedObjectKey];//""//""
 
-  let effectedObjects = fieldChangeEffects[changedObjectKey];//pickUpOn{}
+  let effectedObjects = fieldChangeEffects[changedObjectKey];//pickUpOn{}//undefined
 
   if(effectedObjects){
           Object.keys(effectedObjects).forEach((effectedKey)=>{
+            console.log("console",effectedKey,"  ",{[effectedKey]:""});
 
             let effectedCurrentObject = effectedObjects[effectedKey];//{readable:{},editable:{},required:{}}
           
@@ -37,22 +38,11 @@ function evaluateChangeEffects(fieldState,fieldChangeEffects,objectWithNewValue)
             newFieldState = {...newFieldState,
               ...{[effectedKey]:{...newFieldState[effectedKey],...{readable:booleanResult},...{value:null}}}}
 
+             newFieldState = evaluateChangeEffects(newFieldState,fieldChangeEffects,{[effectedKey]:""});
+              
           });
         }
-
   return newFieldState;
-
-  // let effectedKey = Object.keys(effectedObjects)[0];//pickUpOn
-  // let effectedCurrentObject = effectedObjects[effectedKey];//{readable:{},editable:{},required:{}}
-
-  // let readable = "readable"
-
-  // let booleanResult = evaluateCondition(effectedCurrentObject[readable],fieldState,lotDetailsMapper);
-
-  //   newFieldState = {...newFieldState,
-  //  ...{[effectedKey]:{...newFieldState[effectedKey],...{readable:booleanResult}}}}
-  //  return newFieldState;
-
 }
 class App extends Component {
   state = {
